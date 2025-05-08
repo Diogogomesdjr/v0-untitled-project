@@ -5,10 +5,12 @@ import { Plus, UserPlus, Users, Trash2, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddCollaboratorDialog } from "@/components/add-collaborator-dialog"
 import { AddSkillDialog } from "@/components/add-skill-dialog"
 import { AddTeamDialog } from "@/components/add-team-dialog"
 import { SkillLegend } from "@/components/skill-legend"
+import { SkillBarChart } from "@/components/skill-bar-chart"
 import type { Collaborator, Skill, Team } from "@/lib/types"
 
 export default function SkillMatrix() {
@@ -19,6 +21,8 @@ export default function SkillMatrix() {
   const [isAddCollaboratorOpen, setIsAddCollaboratorOpen] = useState(false)
   const [isAddSkillOpen, setIsAddSkillOpen] = useState(false)
   const [isAddTeamOpen, setIsAddTeamOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<"table" | "chart">("table")
+  const [compareMode, setCompareMode] = useState<boolean>(false)
 
   const allCollaborators = teams.flatMap((team) => team.collaborators)
 
@@ -29,6 +33,11 @@ export default function SkillMatrix() {
     selectedCollaborator && selectedCollaborator !== "all"
       ? allCollaborators.filter((collab) => collab.id === selectedCollaborator)
       : filteredCollaborators
+
+  const selectedCollaboratorData =
+    selectedCollaborator && selectedCollaborator !== "all"
+      ? allCollaborators.find((c) => c.id === selectedCollaborator)
+      : null
 
   const handleAddCollaborator = (newCollaborator: Collaborator, teamId: string) => {
     setTeams(
@@ -175,7 +184,15 @@ export default function SkillMatrix() {
         </div>
 
         <div>
-          <Select value={selectedCollaborator || "all"} onValueChange={setSelectedCollaborator}>
+          <Select
+            value={selectedCollaborator || "all"}
+            onValueChange={(value) => {
+              setSelectedCollaborator(value)
+              if (value !== "all") {
+                setViewMode("chart")
+              }
+            }}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecione um colaborador" />
             </SelectTrigger>
@@ -277,119 +294,279 @@ export default function SkillMatrix() {
       )}
 
       {skills.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse mt-6">
-            <thead>
-              <tr className="bg-gray-100 dark:bg-gray-800">
-                <th className="p-3 text-left border">Colaborador</th>
-                {skills.map((skill) => (
-                  <th key={skill.id} className="p-3 text-center border min-w-[120px]">
-                    {skill.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayedCollaborators.length > 0 ? (
-                displayedCollaborators.map((collaborator) => (
-                  <tr key={collaborator.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                    <td className="p-3 border">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {collaborator.photoUrl ? (
-                            <img
-                              src={collaborator.photoUrl || "/placeholder.svg"}
-                              alt={collaborator.name}
-                              className="w-10 h-10 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                              <Users className="h-5 w-5 text-gray-500" />
+        <>
+          {selectedCollaboratorData && (
+            <div className="mb-6">
+              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "table" | "chart")}>
+                <div className="flex justify-between items-center mb-4">
+                  <TabsList>
+                    <TabsTrigger value="table">Tabela</TabsTrigger>
+                    <TabsTrigger value="chart">Gráfico</TabsTrigger>
+                  </TabsList>
+
+                  {viewMode === "chart" && (
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="compare-mode" className="text-sm">
+                        Comparar com outros
+                      </label>
+                      <input
+                        id="compare-mode"
+                        type="checkbox"
+                        checked={compareMode}
+                        onChange={(e) => setCompareMode(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <TabsContent value="chart" className="mt-0">
+                  {skills.length > 0 ? (
+                    <SkillBarChart
+                      collaborator={selectedCollaboratorData}
+                      skills={skills}
+                      allCollaborators={compareMode ? filteredCollaborators : []}
+                      compareMode={compareMode}
+                    />
+                  ) : (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center p-6">
+                          <h3 className="text-lg font-medium mb-2">Nenhuma habilidade cadastrada</h3>
+                          <p className="text-muted-foreground mb-4">Adicione habilidades para visualizar o gráfico</p>
+                          <Button onClick={() => setIsAddSkillOpen(true)}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Adicionar Habilidade
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="table" className="mt-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-100 dark:bg-gray-800">
+                          <th className="p-3 text-left border">Colaborador</th>
+                          {skills.map((skill) => (
+                            <th key={skill.id} className="p-3 text-center border min-w-[120px]">
+                              {skill.name}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <td className="p-3 border">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {selectedCollaboratorData.photoUrl ? (
+                                  <img
+                                    src={selectedCollaboratorData.photoUrl || "/placeholder.svg"}
+                                    alt={selectedCollaboratorData.name}
+                                    className="w-10 h-10 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                    <Users className="h-5 w-5 text-gray-500" />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{selectedCollaboratorData.name}</span>
+                                    {selectedCollaboratorData.isFocal && (
+                                      <Shield className="h-5 w-5 text-blue-500" title="Colaborador Responsável" />
+                                    )}
+                                  </div>
+                                  <span className="text-sm text-gray-500">
+                                    {
+                                      teams.find((t) =>
+                                        t.collaborators.some((c) => c.id === selectedCollaboratorData.id),
+                                      )?.name
+                                    }
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleFocal(selectedCollaboratorData.id)}
+                                  className="opacity-30 hover:opacity-100 transition-opacity"
+                                  title={
+                                    selectedCollaboratorData.isFocal
+                                      ? "Remover como responsável"
+                                      : "Marcar como responsável"
+                                  }
+                                >
+                                  <Shield
+                                    className={`h-4 w-4 ${selectedCollaboratorData.isFocal ? "text-blue-500" : "text-gray-400"}`}
+                                  />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteCollaborator(selectedCollaboratorData.id)}
+                                  className="opacity-30 hover:opacity-100 transition-opacity"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
                             </div>
-                          )}
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{collaborator.name}</span>
-                              {collaborator.isFocal && (
-                                <Shield className="h-5 w-5 text-blue-500" title="Colaborador Responsável" />
+                          </td>
+
+                          {skills.map((skill) => {
+                            const rating = selectedCollaboratorData.skills[skill.id] || "N/A"
+                            const isApt = selectedCollaboratorData.aptitude?.[skill.id] || false
+
+                            return (
+                              <td key={`${selectedCollaboratorData.id}-${skill.id}`} className="p-3 border text-center">
+                                <div className="flex flex-col items-center gap-2">
+                                  <button
+                                    onClick={() => handleSkillRating(selectedCollaboratorData.id, skill.id)}
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${getRatingColorClass(rating)}`}
+                                  >
+                                    {rating}
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleAptitude(selectedCollaboratorData.id, skill.id)}
+                                    className={`text-xs px-2 py-1 rounded ${isApt ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
+                                  >
+                                    {isApt ? "Apto" : "Não apto"}
+                                  </button>
+                                </div>
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+
+          {!selectedCollaboratorData && (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse mt-6">
+                <thead>
+                  <tr className="bg-gray-100 dark:bg-gray-800">
+                    <th className="p-3 text-left border">Colaborador</th>
+                    {skills.map((skill) => (
+                      <th key={skill.id} className="p-3 text-center border min-w-[120px]">
+                        {skill.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedCollaborators.length > 0 ? (
+                    displayedCollaborators.map((collaborator) => (
+                      <tr key={collaborator.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <td className="p-3 border">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {collaborator.photoUrl ? (
+                                <img
+                                  src={collaborator.photoUrl || "/placeholder.svg"}
+                                  alt={collaborator.name}
+                                  className="w-10 h-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                  <Users className="h-5 w-5 text-gray-500" />
+                                </div>
                               )}
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{collaborator.name}</span>
+                                  {collaborator.isFocal && (
+                                    <Shield className="h-5 w-5 text-blue-500" title="Colaborador Responsável" />
+                                  )}
+                                </div>
+                                <span className="text-sm text-gray-500">
+                                  {teams.find((t) => t.collaborators.some((c) => c.id === collaborator.id))?.name}
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-sm text-gray-500">
-                              {teams.find((t) => t.collaborators.some((c) => c.id === collaborator.id))?.name}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleFocal(collaborator.id)}
-                            className="opacity-30 hover:opacity-100 transition-opacity"
-                            title={collaborator.isFocal ? "Remover como responsável" : "Marcar como responsável"}
-                          >
-                            <Shield className={`h-4 w-4 ${collaborator.isFocal ? "text-blue-500" : "text-gray-400"}`} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteCollaborator(collaborator.id)}
-                            className="opacity-30 hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </div>
-                    </td>
-
-                    {skills.map((skill) => {
-                      const rating = collaborator.skills[skill.id] || "N/A"
-                      const isApt = collaborator.aptitude?.[skill.id] || false
-
-                      return (
-                        <td key={`${collaborator.id}-${skill.id}`} className="p-3 border text-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <button
-                              onClick={() => handleSkillRating(collaborator.id, skill.id)}
-                              className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${getRatingColorClass(rating)}`}
-                            >
-                              {rating}
-                            </button>
-                            <button
-                              onClick={() => handleToggleAptitude(collaborator.id, skill.id)}
-                              className={`text-xs px-2 py-1 rounded ${isApt ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
-                            >
-                              {isApt ? "Apto" : "Não apto"}
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleFocal(collaborator.id)}
+                                className="opacity-30 hover:opacity-100 transition-opacity"
+                                title={collaborator.isFocal ? "Remover como responsável" : "Marcar como responsável"}
+                              >
+                                <Shield
+                                  className={`h-4 w-4 ${collaborator.isFocal ? "text-blue-500" : "text-gray-400"}`}
+                                />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteCollaborator(collaborator.id)}
+                                className="opacity-30 hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
                           </div>
                         </td>
-                      )
-                    })}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={skills.length + 1} className="p-6 text-center border">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <Users className="h-8 w-8 text-gray-400" />
-                      <p className="text-muted-foreground">Nenhum colaborador encontrado</p>
-                      {teams.length > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsAddCollaboratorOpen(true)}
-                          className="mt-2"
-                        >
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Adicionar Colaborador
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+
+                        {skills.map((skill) => {
+                          const rating = collaborator.skills[skill.id] || "N/A"
+                          const isApt = collaborator.aptitude?.[skill.id] || false
+
+                          return (
+                            <td key={`${collaborator.id}-${skill.id}`} className="p-3 border text-center">
+                              <div className="flex flex-col items-center gap-2">
+                                <button
+                                  onClick={() => handleSkillRating(collaborator.id, skill.id)}
+                                  className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${getRatingColorClass(rating)}`}
+                                >
+                                  {rating}
+                                </button>
+                                <button
+                                  onClick={() => handleToggleAptitude(collaborator.id, skill.id)}
+                                  className={`text-xs px-2 py-1 rounded ${isApt ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
+                                >
+                                  {isApt ? "Apto" : "Não apto"}
+                                </button>
+                              </div>
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={skills.length + 1} className="p-6 text-center border">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Users className="h-8 w-8 text-gray-400" />
+                          <p className="text-muted-foreground">Nenhum colaborador encontrado</p>
+                          {teams.length > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsAddCollaboratorOpen(true)}
+                              className="mt-2"
+                            >
+                              <UserPlus className="mr-2 h-4 w-4" />
+                              Adicionar Colaborador
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
       <AddCollaboratorDialog

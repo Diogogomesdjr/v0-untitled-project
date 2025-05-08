@@ -56,9 +56,9 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "uuid": "latest",
     "vaul": "^0.9.6",
-    "zod": "^3.24.1",
-    "uuid": "latest"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22",
